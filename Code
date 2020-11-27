@@ -1,0 +1,379 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Mar 19 10:01:58 2020
+
+@author: Michael Mullen
+"""
+import os
+os.chdir("C:\xxx")
+os.listdir(os.curdir)
+
+input_path="C:\xxx\Inputs"
+output_path="C:\xxx\Out"
+
+
+import math
+def Deregression_DG2009(traitebv,sireebv,damebv,rel,relsire,reldam,herit):
+    traitebv=float(traitebv)
+    sireebv=float(sireebv)
+    damebv=float(damebv)
+    rel=float(rel)/100
+    relsire=float(relsire)/100
+    reldam=float(reldam)/100
+    herit=float(herit)
+    
+   # print traitebv
+    
+    lamda=(1-herit)/herit    # always positive except if h2=0 or 1
+    #print "lamda ",type(lamda), lamda
+    
+    PAebv=(sireebv+damebv)/2 # always positive
+   # print "PAebv ",type(PAebv), PAebv
+    
+    r2PA=(relsire+reldam)/4  # positive
+   # print "r2PA ",type(r2PA), r2PA
+    
+    alpha=round(1/(0.5-r2PA),4)       # pos
+   # print "alpha ",type(alpha), alpha
+    
+    sigma=(round((0.5-r2PA)/(1-rel),4)) # pos
+   # print "sigma ",type(sigma), sigma
+    
+    Zprimepa_Zpa=lamda*(0.5*alpha-4.0)+0.5*lamda*(math.sqrt(alpha*alpha+16.0/sigma))
+   # print "Zprimepa_Zpa ",type(Zprimepa_Zpa), Zprimepa_Zpa
+    
+    Zprime_Z=(sigma*Zprimepa_Zpa)+(2*lamda*(2.0*sigma-1.0))
+   # print "Zprime_Z ",type(Zprime_Z), Zprime_Z
+    
+    r2_minusPA=1.0-lamda/(Zprime_Z+lamda)
+  #  print "r2_minusPA ",type(r2_minusPA), r2_minusPA
+    
+    yi=-2*lamda*PAebv+(Zprime_Z+2*lamda)*traitebv 
+   # print "yi ",type(yi), yi
+    
+    #traitebv_minusPA=yi/(Zprime_Z+lamda) # parental contribution removed from EBV
+    #dereg_EBV_minusPA=traitebv_minusPA/r2_minusPA # deregressed EBV less PA using PA removed EBV and R2
+    
+    # alternate calc
+    dereg_EBV_minusPA2=yi/Zprime_Z
+    return dereg_EBV_minusPA2#lamda#sigma#Zprime_Z #
+
+
+def Adj_rel(traitebv,sireebv,damebv,rel,relsire,reldam,herit):
+    traitebv=float(traitebv)
+    sireebv=float(sireebv)
+    damebv=float(damebv)
+    rel=float(rel)/100
+    relsire=float(relsire)/100
+    reldam=float(reldam)/100
+    herit=float(herit)
+    
+   # print traitebv
+    
+    lamda=(1-herit)/herit    # always positive except if h2=0 or 1
+   #print "lamda ",type(lamda), lamda
+    
+    PAebv=(sireebv+damebv)/2 # always positive
+    #print "PAebv ",type(PAebv), PAebv
+    
+    r2PA=(relsire+reldam)/4  # positive
+    #print "r2PA ",type(r2PA), r2PA
+    
+    alpha=round(1/(0.5-r2PA),4)       # pos
+    #print "alpha ",type(alpha), alpha
+    
+    sigma=(round((0.5-r2PA)/(1-rel),4)) # pos
+    #print "sigma ",type(sigma), sigma
+    
+    Zprimepa_Zpa=lamda*(0.5*alpha-4.0)+0.5*lamda*(math.sqrt(alpha*alpha+16.0/sigma))
+    #print "Zprimepa_Zpa ",type(Zprimepa_Zpa), Zprimepa_Zpa
+    
+    Zprime_Z=(sigma*Zprimepa_Zpa)+(2*lamda*(2.0*sigma-1.0))
+    #print "Zprime_Z ",type(Zprime_Z), Zprime_Z
+    
+    r2_minusPA=1.0-lamda/(Zprime_Z+lamda)
+    #print "r2_minusPA ",type(r2_minusPA), r2_minusPA
+    
+    yi=-2*lamda*PAebv+(Zprime_Z+2*lamda)*traitebv 
+    #print "yi ",type(yi), yi
+    
+    #traitebv_minusPA=yi/(Zprime_Z+lamda) # parental contribution removed from EBV
+    #dereg_EBV_minusPA=traitebv_minusPA/r2_minusPA # deregressed EBV less PA using PA removed EBV and R2
+    
+    #s alternate calc
+    #dereg_EBV_minusPA2=yi/Zprime_Z
+    return  r2_minusPA#dereg_EBV_minusPA2#lamda#sigma#Zprime_Z #
+
+
+def All_traits_deregression_and_weights_dairy(phenotypes_adj,pedfile,herit_file,IDS,cutoff1, cutoff2,missing,c):
+    '''incldues output for adjusted reliabilities.
+       Includes selecting based on adj relaibilities cutoff.
+       inputs: 2 texts files with list of traits and heritabilities, and phenotypes adjusted for base adjustment, pedfile
+       outputs: 1-text files with deregressed PTA's for each trait per animal; 2-Adj_rel_all; 3- Adj_rel_cutoff, 4-Weights'''
+    x=open(herit_file,"r").readlines() #text file
+    y=open(phenotypes_adj,"r").readlines() #text file
+    z=open(IDS,"r").readlines()
+    miss=open(missing,"r").readlines()
+    
+    IDS=[]    
+    missing2=[]    
+    count=0
+    
+    for i in z:
+        IDS.append(i.strip())
+        
+    for i in miss:
+        missing2.append(i.strip())
+            
+    ped=open(pedfile,"r").readlines()
+    
+    print ("Loaded..there are "+str(len(y)-1)+" animals and "+str(len(x))+" traits" )    
+    col_headers=y[0].split()
+    
+    #out2=open("Deregressed_PTA_DG2009_rel_"+phenotypes_adj+"NO_CUTOFF.txt","w")
+    out2a=open(output_path+"\Deregressed_PTA_DG2009_rel_"+phenotypes_adj+str(cutoff1)+".txt","w")
+    out2b=open(output_path+"\Deregressed_PTA_DG2009_rel_"+phenotypes_adj+str(cutoff2)+".txt","w")
+    out3=open(output_path+"\Adj_rel_"+phenotypes_adj+str(cutoff1)+".txt","w")
+    out3b=open(output_path+"\Adj_rel_"+phenotypes_adj+str(cutoff2)+".txt","w")
+    #out4=open("Adj_rel_"+phenotypes_adj+"NO_CUTOFF.txt","w")
+    out5=open(output_path+"\missing_ids2.txt","w")
+
+    #out2.write("ID"+"\t")
+    out2a.write("ID"+"\t")
+    out2b.write("ID"+"\t") # removed % breed contribution
+    out3.write("ID"+"\t")
+    out3b.write("ID"+"\t")
+    #out4.write("ID"+"\t")
+    
+    ped_dict={}
+    master_dict={}
+    
+    missing=[]
+    
+    for i in ped[1:]:
+        line=i.split(" ")
+        ped_dict[line[0]]={"sire":line[3], "dam":line[4]}
+     
+    heritability={}
+    for b in x:
+        #print b
+        h=b.split()
+        #print h[0]
+        heritability[h[0]]=h[1]
+        #base_adjustments[h[0]]=0
+    
+    for i in y[1:]:
+        line=i.split()
+        for head in col_headers:
+            index=col_headers.index(head)
+            try:
+                master_dict[line[0]].update({head:line[index]})  
+            except:
+                master_dict[line[0]]={head:line[index]} 
+            
+    for line in x:
+        t=line.split()
+        trait=t[0]
+        if len(t)==2:
+            #out2.write(trait+"\t")
+            out2a.write(trait+"\t")
+            out2b.write(trait+"\t")
+            out3.write(trait+"\t")
+            out3b.write(trait+"\t")
+            #out4.write(trait+"\t")
+
+    #out2.write("\n")
+    out2a.write("\n")
+    out2b.write("\n")
+    out3.write("\n")
+    out3b.write("\n")
+    #out4.write("\n")
+    
+    for animal in y[1:]:
+        count+=1
+        words=animal.split()
+    
+        ID=words[0]
+        
+        if ID in IDS and ID not in missing2:
+            #out2.write(ID+"\t") 
+            out2a.write(ID+"\t")
+            out2b.write(ID+"\t")
+            out3.write(ID+"\t")
+            out3b.write(ID+"\t")
+            #out4.write(ID+"\t") 
+        
+            for line in x:
+                t=line.split()
+                #if len(t)>=2:
+                trait=t[0]
+                #print trait
+                traitebv=float(master_dict[ID][trait])
+                #print traitebv
+                try:
+                    sireebv=float(master_dict[ped_dict[ID]["sire"]][trait])
+                except KeyError:
+                    sireebv=0
+                    if ID not in missing:
+                        missing.append(ID)
+                        out5.write(ID+"\n")
+                    
+                #print sireebv
+                rel=float(master_dict[ID][trait+"_REL"])
+                try:
+                    relsire=float(master_dict[ped_dict[ID]["sire"]][trait+"_REL"])
+                except KeyError:
+                    relsire=0
+                
+                try:
+                    damebv=float(master_dict[ped_dict[ID]["dam"]][trait])
+                except KeyError:
+                    damebv=0
+                
+                try:
+                    reldam=float(master_dict[ped_dict[ID]["dam"]][trait+"_REL"])
+                except KeyError:
+                    reldam=0                
+                
+                herit=float(heritability[trait])
+            
+                try:
+                    rel_adj=Adj_rel(traitebv,sireebv,damebv,rel,relsire,reldam,herit)            
+            
+                except ValueError:
+                    rel_adj=0  
+                    
+                #D_PTA_DG=Deregression_DG2009(traitebv,sireebv,damebv,rel,relsire,reldam,herit)    
+            
+                if rel_adj>=cutoff2:
+                    D_PTA_DG=Deregression_DG2009(traitebv,sireebv,damebv,rel,relsire,reldam,herit)
+                    #out2.write(str(D_PTA_DG)+"\t")
+                    out2a.write(str(D_PTA_DG)+"\t")
+                    out2b.write(str(D_PTA_DG)+"\t")
+                    out3.write(str(rel_adj)+"\t")
+                    out3b.write(str(rel_adj)+"\t")
+                    #out4.write(str(rel_adj)+"\t")
+                elif rel_adj>=cutoff1 and rel_adj<cutoff2:
+                    D_PTA_DG=Deregression_DG2009(traitebv,sireebv,damebv,rel,relsire,reldam,herit)
+                    #out2.write(str(D_PTA_DG)+"\t")
+                    out2a.write(str(D_PTA_DG)+"\t")
+                    out2b.write("NA"+"\t")
+                    out3.write(str(rel_adj)+"\t")
+                    out3b.write("NA"+"\t")
+                    #out4.write(str(rel_adj)+"\t")                    
+                else:
+                    #out2.write(str(D_PTA_DG)+"\t")
+                    out2a.write("NA"+"\t") 
+                    out2b.write("NA"+"\t")
+                    out3.write("NA"+"\t")
+                    out3b.write("NA"+"\t")
+                    #out4.write(str(rel_adj)+"\t")
+
+            #out2.write("\n")
+            out2a.write("\n")
+            out2b.write("\n")
+            out3.write("\n")
+            out3b.write("\n")
+            #out4.write("\n")     
+                       
+    #out2.close()
+    out2a.close()
+    out2b.close()
+    out3.close()
+    out3b.close()
+    #out4.close()
+    out5.close()
+    
+    print("Deregression completed!...estimating weights...."+"\n")
+ 
+    def EBV_weights_DG2009(c, rel, herit_value):
+        ''' Calculates weightings to be assigned to deregressed EBVs '''
+        rel=(float(rel))#/100)
+        herit_calc=float(herit_value)
+        c=float(c)
+        if rel==0:
+            w="NA"
+        else:
+            w=(1-herit_calc)/((c+((1-rel)/rel))*herit_calc)
+        
+        return w
+
+    def All_traits_weighting(deRegEBVs, adj_rel,herit_file, c):
+        '''inputs: text file with list of deregressed EBVs, raw input file with heritabilities and reliabilities
+           outputs: text file with weightings for deregressed EBVs/PTA's for each trait per animal'''
+           
+        
+        x=open(input_path+"\\"+herit_file,"r").readlines() #text file
+        y=open(output_path+"\\"+adj_rel,"r").readlines() #text file
+        z=open(output_path+"\\"+deRegEBVs,"r").readlines() # text file
+        print ("Loaded..there are "+str(len(z)-1)+" animals and "+str(len(x))+" traits")
+        
+        adjRel_col_headers=y[0].split()
+        EBV_col_headers=z[0].split()
+      
+        out=open(output_path+"\Weights_Dereg_PTA_DG2009_c_"+str(c)+"_"+adj_rel,"w")#
+        out.write("ID"+"\t")#"+"BREED"+"\t"+"%"+"\t")
+    
+       # ebi_list=["psi","fsi","csi","carcsi","hsi","ebi"]
+          
+        heritability={}
+        for b in x:
+            #print b
+            h=b.split()
+            #print h[0]
+            heritability[h[0]]=h[1] 
+    
+        
+        i = EBV_col_headers[1:] # assumes cols 0 are ID
+        
+        for j in i:
+             traitfull=j
+             out.write(traitfull+"\t")
+    
+        out.write("\n")
+        
+        for line_no in range(1,len(z)):
+            words=z[line_no].split()
+            
+            #dairy
+            #ITT=words[0] # requires ITT to be the first col
+            #ID=words[1] # requires ID to be the 2nd column
+            
+            ID=words[0] # requires ID to be the first col
+            #order=words[1] # requires Breed to be the 2nd column
+            #Percent=words[2] # %
+                    
+            out.write(ID+"\t")#+Percent+"\t") 
+            
+            #print ITT
+            for j in i:
+                trait=j
+                EBV=j
+                rel=trait
+                herit_value=float(heritability[trait])
+                
+                trait_index=EBV_col_headers.index(EBV)
+                rel_index=adjRel_col_headers.index(rel)
+                
+                if y[line_no].split()[rel_index]!="NA"and y[line_no].split()[0]==z[line_no].split()[0]:
+                    W_PTA=EBV_weights_DG2009(c,y[line_no].split()[rel_index],herit_value)
+                    out.write(str(W_PTA)+"\t")  
+                else:
+                    out.write("NA"+"\t")
+    
+            out.write("\n")
+        out.close()
+ 
+    #deRegEBVs="Phenos.txt"
+    #adj_rel="Rels.txt"
+    #herit_file="herit.txt"
+    #c=0.10
+    
+    All_traits_weighting("Deregressed_PTA_DG2009_rel_"+phenotypes_adj+str(cutoff1)+".txt", "Adj_rel_"+phenotypes_adj+str(cutoff1)+".txt",herit_file, c)
+    All_traits_weighting("Deregressed_PTA_DG2009_rel_"+phenotypes_adj+str(cutoff2)+".txt", "Adj_rel_"+phenotypes_adj+str(cutoff2)+".txt",herit_file, c)
+    #All_traits_weighting("Deregressed_PTA_DG2009_rel_"+phenotypes_adj+"NO_CUTOFF.txt", "Adj_rel_"+phenotypes_adj+"NO_CUTOFF.txt",herit_file, c)
+
+All_traits_deregression_and_weights_dairy("EBV_dairy_mmullen.txt_&RELS_base_adj_EXAMPLE.txt","pedfile_MM.txt","herit_dairy_14.txt","IDS.txt",0.1,0.2,"missing_ids.txt",0.1)    
+
+    
+
